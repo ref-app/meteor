@@ -1,31 +1,35 @@
-const enabled = __meteor_runtime_config__.reactFastRefreshEnabled;
+function _typeof(obj) { "@babel/helpers - typeof"; if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
+
+var enabled = __meteor_runtime_config__.reactFastRefreshEnabled;
 
 if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
-  const runtime = require('react-refresh/runtime');
+  var runtime = require('react-refresh/runtime');
 
-  let timeout = null;
+  var timeout = null;
+
   function scheduleRefresh() {
     if (!timeout) {
-      timeout = setTimeout(() => {
+      timeout = setTimeout(function () {
         timeout = null;
         runtime.performReactRefresh();
       }, 0);
     }
-  }
-
-  // The react refresh babel plugin only registers functions. For react
+  } // The react refresh babel plugin only registers functions. For react
   // to update other types of exports (such as classes), we have to
   // register them
+
+
   function registerExportsForReactRefresh(moduleId, moduleExports) {
     runtime.register(moduleExports, moduleId + ' %exports%');
 
-    if (moduleExports == null || typeof moduleExports !== 'object') {
+    if (moduleExports == null || _typeof(moduleExports) !== 'object') {
       // Exit if we can't iterate over exports.
       return;
     }
 
     for (var key in moduleExports) {
       var desc = Object.getOwnPropertyDescriptor(moduleExports, key);
+
       if (desc && desc.get) {
         // Don't invoke getters as they may have side effects.
         continue;
@@ -35,14 +39,16 @@ if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
       var typeID = moduleId + ' %exports% ' + key;
       runtime.register(exportValue, typeID);
     }
-  };
+  }
 
-  // Modules that only export components become React Refresh boundaries.
+  ; // Modules that only export components become React Refresh boundaries.
+
   function isReactRefreshBoundary(moduleExports) {
     if (runtime.isLikelyComponentType(moduleExports)) {
       return true;
     }
-    if (moduleExports == null || typeof moduleExports !== 'object') {
+
+    if (moduleExports == null || _typeof(moduleExports) !== 'object') {
       // Exit if we can't iterate over exports.
       return false;
     }
@@ -52,8 +58,8 @@ if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
 
     for (var key in moduleExports) {
       hasExports = true;
-
       var desc = Object.getOwnPropertyDescriptor(moduleExports, key);
+
       if (desc && desc.get) {
         // Don't invoke getters as they may have side effects.
         return false;
@@ -65,15 +71,21 @@ if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
     }
 
     return hasExports && onlyExportComponents;
-  };
+  }
 
+  ;
   runtime.injectIntoGlobalHook(window);
 
-  window.$RefreshReg$ = () => { };
-  window.$RefreshSig$ = () => type => type;
+  window.$RefreshReg$ = function () {};
+
+  window.$RefreshSig$ = function () {
+    return function (type) {
+      return type;
+    };
+  };
 
   module.hot.onRequire({
-    before(module) {
+    before: function before(module) {
       if (module.loaded) {
         // The module was already executed
         return;
@@ -81,20 +93,20 @@ if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
 
       var prevRefreshReg = window.$RefreshReg$;
       var prevRefreshSig = window.$RefreshSig$;
-
       window.RefreshRuntime = runtime;
-      window.$RefreshReg$ = (type, _id) => {
-        const fullId = module.id + ' ' + _id;
-        RefreshRuntime.register(type, fullId);
-      }
-      window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
 
+      window.$RefreshReg$ = function (type, _id) {
+        var fullId = module.id + ' ' + _id;
+        RefreshRuntime.register(type, fullId);
+      };
+
+      window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
       return {
-        prevRefreshReg,
-        prevRefreshSig
+        prevRefreshReg: prevRefreshReg,
+        prevRefreshSig: prevRefreshSig
       };
     },
-    after(module, beforeData) {
+    after: function after(module, beforeData) {
       // TODO: handle modules with errors
       if (!beforeData) {
         return;
@@ -102,10 +114,10 @@ if (enabled && process.env.NODE_ENV !== 'production' && module.hot) {
 
       window.$RefreshReg$ = beforeData.prevRefreshReg;
       window.$RefreshSig$ = beforeData.prevRefreshSig;
+
       if (isReactRefreshBoundary(module.exports)) {
         registerExportsForReactRefresh(module.id, module.exports);
         module.hot.accept();
-
         scheduleRefresh();
       }
     }

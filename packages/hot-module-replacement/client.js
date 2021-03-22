@@ -1,46 +1,48 @@
 // TODO: add an api to Reify to update cached exports for a module
-const ReifyEntry = require('/node_modules/meteor/modules/node_modules/reify/lib/runtime/entry.js')
+var ReifyEntry = require('/node_modules/meteor/modules/node_modules/reify/lib/runtime/entry.js');
 
-const SOURCE_URL_PREFIX = "meteor://\u{1f4bb}app";
-
-// Due to the bundler and proxy running in the same node process
+var SOURCE_URL_PREFIX = "meteor://\uD83D\uDCBBapp"; // Due to the bundler and proxy running in the same node process
 // this could possibly be ran after the next build finished
 // TODO: the builder should inject a build timestamp in the bundle
-let lastUpdated = Date.now();
-let appliedChangeSets = [];
-let removeErrorMessage = null;
 
-let arch = __meteor_runtime_config__.isModern ? 'web.browser' : 'web.browser.legacy';
-let enabled = arch === 'web.browser';
+var lastUpdated = Date.now();
+var appliedChangeSets = [];
+var removeErrorMessage = null;
+var arch = __meteor_runtime_config__.isModern ? 'web.browser' : 'web.browser.legacy';
+var enabled = arch === 'web.browser';
 
 if (!enabled) {
-  console.log(`HMR is not supported in ${arch}`);
+  console.log("HMR is not supported in ".concat(arch));
 }
 
-
-const imported = Object.create(null);
-const importedBy = Object.create(null);
+var imported = Object.create(null);
+var importedBy = Object.create(null);
 
 if (module._onRequire) {
   module._onRequire({
-    before(importedModule, parentId) {
+    before: function before(importedModule, parentId) {
       if (parentId === module.id) {
         // While applying updates we import modules to re-run them.
         // Don't track those imports since we don't want them to affect
         // if a future change to the file can be accepted
         return;
       }
+
       imported[parentId] = imported[parentId] || new Set();
       imported[parentId].add(importedModule.id);
-
       importedBy[importedModule.id] = importedBy[importedModule.id] || new Set();
       importedBy[importedModule.id].add(parentId);
-    },
+    }
   });
 }
 
-let pendingReload = () => Reload._reload({ immediateMigration: true });
-let mustReload = false;
+var pendingReload = function pendingReload() {
+  return Reload._reload({
+    immediateMigration: true
+  });
+};
+
+var mustReload = false;
 
 function handleMessage(message) {
   if (message.type === 'register-failed') {
@@ -56,8 +58,9 @@ function handleMessage(message) {
       mustReload = true;
       pendingReload();
     } else {
-      console.log(`HMR: Register failed for unknown reason`, message);
+      console.log("HMR: Register failed for unknown reason", message);
     }
+
     return;
   } else if (message.type === 'app-state') {
     if (removeErrorMessage) {
@@ -65,50 +68,43 @@ function handleMessage(message) {
     }
 
     if (message.state === 'error' && Package['dev-error-overlay']) {
-      removeErrorMessage = Package['dev-error-overlay']
-        .DevErrorOverlay
-        .showMessage('Your app is crashing. Here are the latest logs:', message.log.join('\n'));
+      removeErrorMessage = Package['dev-error-overlay'].DevErrorOverlay.showMessage('Your app is crashing. Here are the latest logs:', message.log.join('\n'));
     }
 
     return;
   }
 
   if (message.type !== 'changes') {
-    throw new Error(`Unknown HMR message type ${message.type}`);
+    throw new Error("Unknown HMR message type ".concat(message.type));
   }
 
-  const hasUnreloadable = message.changeSets.find(changeSet => {
+  var hasUnreloadable = message.changeSets.find(function (changeSet) {
     return !changeSet.reloadable;
   });
 
-  if (
-    pendingReload &&
-    hasUnreloadable ||
-    message.changeSets.length === 0
-  ) {
+  if (pendingReload && hasUnreloadable || message.changeSets.length === 0) {
     if (message.eager) {
       // This was an attempt to reload before the build finishes
       // If we can't, we will wait until the build finishes to properly handle it
       return;
     }
 
-    console.log('HMR: Unable to do HMR. Falling back to hot code push.')
-    // Complete hot code push if we can not do hot module reload
+    console.log('HMR: Unable to do HMR. Falling back to hot code push.'); // Complete hot code push if we can not do hot module reload
+
     mustReload = true;
     return pendingReload();
-  }
-
-  // In case the user changed how a module works with HMR
+  } // In case the user changed how a module works with HMR
   // in one of the earlier change sets, we want to apply each
   // change set one at a time in order.
-  const succeeded = message.changeSets.filter(changeSet => {
-    return !appliedChangeSets.includes(changeSet.id)
-  }).every(changeSet => {
-    const applied = applyChangeset(changeSet, message.eager);
 
-    // We don't record if a module is unreplaceable
+
+  var succeeded = message.changeSets.filter(function (changeSet) {
+    return !appliedChangeSets.includes(changeSet.id);
+  }).every(function (changeSet) {
+    var applied = applyChangeset(changeSet, message.eager); // We don't record if a module is unreplaceable
     // during an eager update so we can retry and
     // handle the failure after the build finishes
+
     if (applied || !message.eager) {
       appliedChangeSets.push(changeSet.id);
     }
@@ -124,7 +120,7 @@ function handleMessage(message) {
 
   if (!succeeded) {
     if (pendingReload) {
-      console.log('HMR: Some changes can not be applied with HMR. Using hot code push.')
+      console.log('HMR: Some changes can not be applied with HMR. Using hot code push.');
       mustReload = true;
       return pendingReload();
     }
@@ -137,8 +133,8 @@ function handleMessage(message) {
   }
 }
 
-let socket;
-let pendingMessages = [];
+var socket;
+var pendingMessages = [];
 
 function send(message) {
   if (socket) {
@@ -155,38 +151,32 @@ function connect() {
     return;
   }
 
-  let wsUrl = Meteor.absoluteUrl('/__meteor__hmr__/websocket');
-  const protocol = wsUrl.startsWith('https://') ? 'wss://' : 'ws://';
+  var wsUrl = Meteor.absoluteUrl('/__meteor__hmr__/websocket');
+  var protocol = wsUrl.startsWith('https://') ? 'wss://' : 'ws://';
   wsUrl = wsUrl.replace(/^.+\/\//, protocol);
   socket = new WebSocket(wsUrl);
-
   socket.addEventListener('close', function () {
     socket = null;
     console.log('HMR: websocket closed');
     setTimeout(connect, 2000);
   });
-
   socket.addEventListener('open', function () {
     console.log('HMR: connected');
     socket.send(JSON.stringify({
       type: 'register',
-      arch,
+      arch: arch,
       secret: __meteor_runtime_config__._hmrSecret,
-      appId: __meteor_runtime_config__.appId,
+      appId: __meteor_runtime_config__.appId
     }));
-
-    const toSend = pendingMessages.slice();
+    var toSend = pendingMessages.slice();
     pendingMessages = [];
-
-    toSend.forEach(message => {
+    toSend.forEach(function (message) {
       send(message);
     });
   });
-
   socket.addEventListener('message', function (event) {
     handleMessage(JSON.parse(event.data));
   });
-
   socket.addEventListener('error', console.error);
 }
 
@@ -195,14 +185,14 @@ connect();
 function requestChanges() {
   send({
     type: 'request-changes',
-    arch,
+    arch: arch,
     after: lastUpdated
   });
 }
 
 function walkTree(pathParts, tree) {
-  const part = pathParts.shift();
-  const _module = tree.contents[part];
+  var part = pathParts.shift();
+  var _module = tree.contents[part];
 
   if (!_module) {
     console.log('HMR: file does not exist', part, pathParts, _module, tree);
@@ -218,9 +208,9 @@ function walkTree(pathParts, tree) {
 
 function findFile(moduleId) {
   return walkTree(moduleId.split('/').slice(1), module._getRoot());
-}
+} // btoa with unicode support
 
-// btoa with unicode support
+
 function utoa(data) {
   return btoa(unescape(encodeURIComponent(data)));
 }
@@ -229,47 +219,42 @@ function createInlineSourceMap(map) {
   return "//# sourceMappingURL=data:application/json;base64," + utoa(JSON.stringify(map));
 }
 
-function createModuleContent (code, map) {
+function createModuleContent(code, map) {
   return function () {
-    return eval(
-      // Wrap the function(require,exports,module){...} expression in
-      // parentheses to force it to be parsed as an expression.
-      // The sourceURL is treated as a prefix for the sources array
-      // in the source map
-      "(" + code + ")\n//# sourceURL=" + SOURCE_URL_PREFIX +
-      "\n" + createInlineSourceMap(map)
-    ).apply(this, arguments);
-  }
+    return eval( // Wrap the function(require,exports,module){...} expression in
+    // parentheses to force it to be parsed as an expression.
+    // The sourceURL is treated as a prefix for the sources array
+    // in the source map
+    "(" + code + ")\n//# sourceURL=" + SOURCE_URL_PREFIX + "\n" + createInlineSourceMap(map)).apply(this, arguments);
+  };
 }
 
 function replaceFileContent(file, contents) {
   // TODO: to replace content in packages, we need an eval function that runs
   // within the package scope, like dynamic imports does.
-  const moduleFunction = createModuleContent(contents.code, contents.map, file.module.id);
-
+  var moduleFunction = createModuleContent(contents.code, contents.map, file.module.id);
   file.contents = moduleFunction;
 }
 
 function checkModuleAcceptsUpdate(moduleId, checked) {
   checked.add(moduleId);
-  
-  if (moduleId === '/' ) {
+
+  if (moduleId === '/') {
     return false;
   }
-  
-  const file = findFile(moduleId);
-  const moduleHot = file.module.hot;
-  const moduleAccepts = moduleHot ? moduleHot._canAcceptUpdate() : false;
+
+  var file = findFile(moduleId);
+  var moduleHot = file.module.hot;
+  var moduleAccepts = moduleHot ? moduleHot._canAcceptUpdate() : false;
 
   if (moduleAccepts !== null) {
     return moduleAccepts;
   }
 
-  let accepts = null;
-
-  // The module did not accept the update. If the update is accepted depends
+  var accepts = null; // The module did not accept the update. If the update is accepted depends
   // on if the modules that imported this module accept the update.
-  importedBy[moduleId].forEach(depId => {
+
+  importedBy[moduleId].forEach(function (depId) {
     if (depId === '/' && importedBy[moduleId].size > 1) {
       // This module was eagerly required by Meteor.
       // Meteor won't know if the module can be updated
@@ -282,79 +267,71 @@ function checkModuleAcceptsUpdate(moduleId, checked) {
       return;
     }
 
-    const depResult = checkModuleAcceptsUpdate(depId, checked);
+    var depResult = checkModuleAcceptsUpdate(depId, checked);
 
     if (accepts !== false) {
       accepts = depResult;
     }
   });
-
   return accepts === null ? false : accepts;
 }
 
 function addFiles(addedFiles) {
-  addedFiles.forEach(file => {
-    const tree = {};
-    const segments = file.path.split('/').slice(1);
-    const fileName = segments.pop();
-
-    let previous = tree;
-    segments.forEach(segment => {
-      previous[segment] = previous[segment] || {}
-      previous = previous[segment]
+  addedFiles.forEach(function (file) {
+    var tree = {};
+    var segments = file.path.split('/').slice(1);
+    var fileName = segments.pop();
+    var previous = tree;
+    segments.forEach(function (segment) {
+      previous[segment] = previous[segment] || {};
+      previous = previous[segment];
     });
-    previous[fileName] = createModuleContent(
-      file.content.code,
-      file.content.map,
-      file.path
-    );
-
+    previous[fileName] = createModuleContent(file.content.code, file.content.map, file.path);
     meteorInstall(tree, file.meteorInstallOptions);
   });
 }
 
 module.constructor.prototype._reset = function (id) {
-  const moduleId = id || this.id;
-  const file = findFile(moduleId);
+  var moduleId = id || this.id;
+  var file = findFile(moduleId);
+  var hotState = file.module._hotState;
+  var hotData = {};
 
-  const hotState = file.module._hotState;
-
-  const hotData = {};
-  hotState._disposeHandlers.forEach(cb => {
+  hotState._disposeHandlers.forEach(function (cb) {
     cb(hotData);
   });
 
   hotState.data = hotData;
   hotState._disposeHandlers = [];
-  hotState._hotAccepts = null;
-
-
-  // Clear cached exports
+  hotState._hotAccepts = null; // Clear cached exports
   // TODO: check how this affects live bindings for ecmascript modules
+
   delete file.module.exports;
-  const entry = ReifyEntry.getOrCreate(moduleId);
+  var entry = ReifyEntry.getOrCreate(moduleId);
   entry.getters = {};
   entry.setters = {};
   entry.module = null;
-  Object.keys(entry.namespace).forEach(key => {
+  Object.keys(entry.namespace).forEach(function (key) {
     if (key !== '__esModule') {
       delete entry.namespace[key];
     }
   });
 
   if (imported[moduleId]) {
-    imported[moduleId].forEach(depId => {
+    imported[moduleId].forEach(function (depId) {
       importedBy[depId].delete(moduleId);
     });
     imported[moduleId] = new Set();
   }
-}
+};
 
 module.constructor.prototype._replaceModule = function (id, contents) {
-  const moduleId = id || this.id;
-  const root = this._getRoot();
+  var moduleId = id || this.id;
 
-  let file;
+  var root = this._getRoot();
+
+  var file;
+
   try {
     file = walkTree(moduleId.split('/').slice(1), root);
   } catch (e) {
@@ -376,27 +353,25 @@ module.constructor.prototype._replaceModule = function (id, contents) {
     // File hasn't been imported.
     return;
   }
-}
+};
 
-function applyChangeset({
-  changedFiles,
-  addedFiles
-}) {
-  let canApply = true;
-  let toRerun = new Set();
-
-  changedFiles.forEach(({ path }) => {
-    const file = findFile(path);
-
-    // Check if the file has been imported. If it hasn't been,
+function applyChangeset(_ref) {
+  var changedFiles = _ref.changedFiles,
+      addedFiles = _ref.addedFiles;
+  var canApply = true;
+  var toRerun = new Set();
+  changedFiles.forEach(function (_ref2) {
+    var path = _ref2.path;
+    var file = findFile(path); // Check if the file has been imported. If it hasn't been,
     // we can assume update to it can be accepted
+
     if (file.module.exports) {
-      const checked = new Set();
-      const accepts = checkModuleAcceptsUpdate(path, checked);
+      var checked = new Set();
+      var accepts = checkModuleAcceptsUpdate(path, checked);
 
       if (canApply) {
         canApply = accepts;
-        checked.forEach(moduleId => {
+        checked.forEach(function (moduleId) {
           toRerun.add(moduleId);
         });
       }
@@ -407,8 +382,10 @@ function applyChangeset({
     return false;
   }
 
+  changedFiles.forEach(function (_ref3) {
+    var content = _ref3.content,
+        path = _ref3.path;
 
-  changedFiles.forEach(({ content, path }) => {
     module._replaceModule(path, content);
   });
 
@@ -416,61 +393,60 @@ function applyChangeset({
     addFiles(addedFiles);
   }
 
-  toRerun.forEach(moduleId => {
-    const file = findFile(moduleId);
-    // clear module caches and hot state
+  toRerun.forEach(function (moduleId) {
+    var file = findFile(moduleId); // clear module caches and hot state
+
     file.module._reset();
+
     file.module.loaded = false;
   });
 
   try {
-    toRerun.forEach(moduleId => {
+    toRerun.forEach(function (moduleId) {
       require(moduleId);
     });
   } catch (error) {
     console.error('HMR: Error while applying changes:', error);
   }
 
-  const updateCount = changedFiles.length + addedFiles.length;
-  console.log(`HMR: updated ${updateCount} ${updateCount === 1 ? 'file' : 'files'}`);
+  var updateCount = changedFiles.length + addedFiles.length;
+  console.log("HMR: updated ".concat(updateCount, " ").concat(updateCount === 1 ? 'file' : 'files'));
   return true;
 }
 
-const initialVersions = (__meteor_runtime_config__.autoupdate.versions || {})['web.browser'];
-let nonRefreshableVersion = initialVersions.versionNonRefreshable;
-let replaceableVersion = initialVersions.versionReplaceable;
-
-Meteor.startup(() => {
+var initialVersions = (__meteor_runtime_config__.autoupdate.versions || {})['web.browser'];
+var nonRefreshableVersion = initialVersions.versionNonRefreshable;
+var replaceableVersion = initialVersions.versionReplaceable;
+Meteor.startup(function () {
   if (!enabled) {
     return;
   }
 
-  Package['autoupdate'].Autoupdate._clientVersions.watch((doc) => {
+  Package['autoupdate'].Autoupdate._clientVersions.watch(function (doc) {
     if (doc._id !== 'web.browser') {
       return;
     }
 
     if (nonRefreshableVersion !== doc.versionNonRefreshable) {
       nonRefreshableVersion = doc.versionNonRefreshable;
-      console.log('HMR: Some changes can not be applied with HMR. Using hot code push.')
+      console.log('HMR: Some changes can not be applied with HMR. Using hot code push.');
       mustReload = true;
       pendingReload();
     } else if (doc.versionReplaceable !== replaceableVersion) {
       replaceableVersion = doc.versionReplaceable;
       requestChanges();
     }
-  });
-
-  // We disable hot code push for js until there were
+  }); // We disable hot code push for js until there were
   // changes that can not be applied through HMR.
-  Package['reload'].Reload._onMigrate((tryReload) => {
+
+
+  Package['reload'].Reload._onMigrate(function (tryReload) {
     if (mustReload) {
       return [true];
     }
 
     pendingReload = tryReload;
     requestChanges();
-
     return [false];
   });
 });
